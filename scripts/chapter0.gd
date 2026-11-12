@@ -94,8 +94,8 @@ func _process(delta: float) -> void:
 		_fade_alpha += delta / FADE_TIME
 		if _fade_alpha >= 1.0:
 			_fade_alpha = 1.0
-			_fade_phase = 2
 			_apply_frame(_pending_frame)
+			_fade_phase = 2
 	elif _fade_phase == 2:
 		_fade_alpha -= delta / FADE_TIME
 		if _fade_alpha <= 0.0:
