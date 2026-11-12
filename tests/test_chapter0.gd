@@ -8,7 +8,7 @@ extends SceneTree
 const DATA_PATH := "res://data/chapter0.json"
 const BG_DIR := "res://assets/backgrounds/"
 const TRAP_WORDS := ["потому что", "улитка", "иблис", "хасан"]
-const REQUIRED_FIELDS := ["id", "bg", "tint", "gas", "speaker", "text", "src"]
+const REQUIRED_FIELDS := ["id", "bg", "tint", "gas", "speaker", "text", "src", "ref"]
 # the igloo background is allowed to be absent (placeholder is drawn at runtime)
 const BG_ALLOWED_MISSING := ["igloo.png"]
 
@@ -70,6 +70,8 @@ func _run() -> void:
 		_check(frame.get("speaker") is String and frame.get("text") is String,
 				"frame %d: speaker and text are strings" % num)
 		_check(frame.get("src") in ["к", "у", "п"], "frame %d: src is к/у/п" % num)
+		_check(frame.get("ref") is String and str(frame.get("ref")).length() > 0,
+				"frame %d: ref is a non-empty string" % num)
 
 		# bg file existence: "solid"/"solid_frame" are not files; igloo.png is
 		# allowed to be missing (runtime placeholder)
