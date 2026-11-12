@@ -11,6 +11,14 @@ const OPAQUE_MIN := 350
 const OPAQUE_MAX := 1500
 const UNIQUE_COLORS_MAX := 16
 
+# second-round criteria (lead's task, 2026-11-12); old checks above unchanged
+const UNIQUE_COLORS_STRICT := 10
+const ORPHAN_MAX_PCT := 8.0        # pixels without same-color 4-neighbor
+const COMPONENT_MIN_PCT := 95.0    # largest 8-connected opaque component
+const MAJOR_COLOR_MIN_PCT := 4.0   # a "major color form" covers this much
+const MAJOR_COLORS_MIN := 3
+const CONTOUR_HEX := "3B3251"
+
 var _checks := 0
 var _failures := 0
 # Fail-safe default: quit(1) even if _run() aborts on a runtime error.
@@ -101,6 +109,91 @@ func _run() -> void:
 			"opaque pixels %d in [%d..%d]" % [opaque, OPAQUE_MIN, OPAQUE_MAX])
 	_check(unique.size() <= UNIQUE_COLORS_MAX,
 			"unique opaque colors %d <= %d" % [unique.size(), UNIQUE_COLORS_MAX])
+
+	# --- second-round checks (dominant forms, contour, connectivity) -----------
+	var grid := {}          # Vector2i -> opaque hex
+	var color_count := {}   # hex -> pixel count
+	for y in img.get_height():
+		for x in img.get_width():
+			var c := img.get_pixel(x, y)
+			if c.a8 != 255:
+				continue
+			var hex := "%02X%02X%02X" % [c.r8, c.g8, c.b8]
+			grid[Vector2i(x, y)] = hex
+			color_count[hex] = int(color_count.get(hex, 0)) + 1
+
+	var dirs4 := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	var dirs8 := dirs4 + [Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1)]
+	var total := grid.size()
+
+	# strict unique color cap
+	_check(unique.size() <= UNIQUE_COLORS_STRICT,
+			"unique opaque colors %d <= %d (strict)" % [unique.size(), UNIQUE_COLORS_STRICT])
+
+	# pixels without a same-color 4-neighbor
+	var orphans := 0
+	for pt in grid:
+		var same := false
+		for d in dirs4:
+			var n: Vector2i = pt + d
+			if grid.has(n) and grid[n] == grid[pt]:
+				same = true
+				break
+		if not same:
+			orphans += 1
+	var orphan_pct := 100.0 * float(orphans) / float(total)
+	_check(orphan_pct <= ORPHAN_MAX_PCT,
+			"pixels without same-color 4-neighbor %.1f%% <= %.0f%% (%d of %d)"
+					% [orphan_pct, ORPHAN_MAX_PCT, orphans, total])
+
+	# closed contour: boundary opaque pixels must be the contour color
+	var contour_bad := 0
+	var contour_total := 0
+	for pt in grid:
+		var on_edge := false
+		for d in dirs4:
+			if not grid.has(pt + d):
+				on_edge = true   # transparent neighbor or outside the icon
+				break
+		if on_edge:
+			contour_total += 1
+			if grid[pt] != CONTOUR_HEX:
+				contour_bad += 1
+	_check(contour_bad == 0,
+			"contour pixels are %s (%d bad of %d boundary px)"
+					% [CONTOUR_HEX, contour_bad, contour_total])
+
+	# largest 8-connected opaque component
+	var visited := {}
+	var largest := 0
+	for pt in grid:
+		if visited.has(pt):
+			continue
+		var size := 0
+		var queue := [pt]
+		visited[pt] = true
+		while not queue.is_empty():
+			var cur: Vector2i = queue.pop_back()
+			size += 1
+			for d in dirs8:
+				var n: Vector2i = cur + d
+				if grid.has(n) and not visited.has(n):
+					visited[n] = true
+					queue.append(n)
+		largest = maxi(largest, size)
+	var comp_pct := 100.0 * float(largest) / float(total)
+	_check(comp_pct >= COMPONENT_MIN_PCT,
+			"largest 8-connected component %.1f%% >= %.0f%% (%d of %d)"
+					% [comp_pct, COMPONENT_MIN_PCT, largest, total])
+
+	# at least MAJOR_COLORS_MIN major color forms
+	var major := 0
+	for h in color_count:
+		if 100.0 * float(color_count[h]) / float(total) >= MAJOR_COLOR_MIN_PCT:
+			major += 1
+	_check(major >= MAJOR_COLORS_MIN,
+			"major color forms (>= %.0f%% each) >= %d (got %d)"
+					% [MAJOR_COLOR_MIN_PCT, MAJOR_COLORS_MIN, major])
 
 	if _failures == 0:
 		_exit_code = 0
