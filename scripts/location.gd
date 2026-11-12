@@ -8,6 +8,7 @@ extends Node2D
 const SCENES: Dictionary = {
 	KEY_F1: "res://scenes/locations/bazaar.tscn",
 	KEY_F2: "res://scenes/locations/oasis.tscn",
+	KEY_F3: "res://scenes/chapters/chapter0.tscn",
 }
 
 

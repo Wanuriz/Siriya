@@ -103,6 +103,13 @@ func _check_scene() -> void:
 		_check(false, "load scenes/chapters/chapter0.tscn")
 		return
 	var node: Node = packed.instantiate()
+	# In --script mode the root is not inside the tree during _initialize, so
+	# _ready would not run; the setup methods are invoked directly instead
+	# (white-box, still without awaiting any frames).
+	node._cache_nodes()
+	node._setup_gas()
+	node._load_frames()
+	node._apply_frame(1)
 	_check(node.name == "Chapter0", "chapter0 root node name")
 	_check(node.get_script() != null, "chapter0 root has a script")
 	_check(node.has_node("BgColor") and node.has_node("BgSprite"), "background nodes present")

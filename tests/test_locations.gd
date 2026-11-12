@@ -55,6 +55,8 @@ func _run() -> void:
 	var scenes_map: Dictionary = consts.get("SCENES", {})
 	_check(scenes_map.get(KEY_F1, "") == BAZAAR_PATH, "F1 maps to bazaar scene")
 	_check(scenes_map.get(KEY_F2, "") == OASIS_PATH, "F2 maps to oasis scene")
+	_check(scenes_map.get(KEY_F3, "") == "res://scenes/chapters/chapter0.tscn",
+			"F3 maps to chapter0 scene")
 
 	# --- scene structure ------------------------------------------------------
 	_check_location(BAZAAR_PATH, "Bazaar", "bazaar.png", "bazaar")
