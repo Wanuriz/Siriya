@@ -15,7 +15,6 @@ const TEXT_COLOR := Color("f5cba9")
 const LABEL_COLOR := Color("fde073")
 const INDIGO_TINT := Color("363a8c")
 const FADE_TIME := 0.3
-const GAS_FRAMES := [2, 7]
 const LAST_FRAME := 7
 
 var frames: Array = []
@@ -95,8 +94,8 @@ func _process(delta: float) -> void:
 		_fade_alpha += delta / FADE_TIME
 		if _fade_alpha >= 1.0:
 			_fade_alpha = 1.0
-			_apply_frame(_pending_frame)
 			_fade_phase = 2
+			_apply_frame(_pending_frame)
 	elif _fade_phase == 2:
 		_fade_alpha -= delta / FADE_TIME
 		if _fade_alpha <= 0.0:
@@ -141,7 +140,7 @@ func _apply_frame(n: int) -> void:
 			placeholder_label.visible = true
 	var tint = frame.get("tint")
 	bg_sprite.modulate = INDIGO_TINT if tint == "indigo" else Color.WHITE
-	gas.emitting = n in GAS_FRAMES
+	gas.emitting = bool(frame.get("gas", false))
 	text_label.text = str(frame.get("text", ""))
 	var speaker: String = str(frame.get("speaker", ""))
 	speaker_label.text = speaker

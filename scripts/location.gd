@@ -1,5 +1,6 @@
 extends Node2D
-## Minimal location root script: F1 opens the bazaar, F2 opens the oasis.
+## Minimal location root script: F1 opens the bazaar, F2 opens the oasis,
+## F3 opens chapter 0.
 ##
 ## Pressing the key of the current location is a no-op. This script does not
 ## touch GameState: it persists across switches on its own because it is an
