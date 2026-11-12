@@ -1,0 +1,44 @@
+{
+  "_comment": "Правила канон-линта для tools/check.py. severity: error (ломает check.py) или warn (только предупреждение). Правила выведены из docs/CANON_CHEATSHEET.md. Не ослаблять без записи в docs/DECISIONS.md.",
+  "scan_dirs": ["data", "scenes", "scripts"],
+  "scan_ext": [".json", ".gd", ".tscn", ".tres", ".cfg"],
+  "forbid": [
+    {"id": "R-hor", "severity": "error", "pattern": "хор\\s+без\\s+суда", "flags": "i",
+     "message": "Нужно «хоровод без суда», не «хор без суда». Название главы 7 не утверждено."},
+    {"id": "R-povsyudu", "severity": "error", "pattern": "оказывается\\s+повсюду", "flags": "i",
+     "message": "«оказывается повсюду» не использовать: слова Жака о «знаю всё и везде» - его заявление, не закон мира."},
+    {"id": "R-povsyudu-w", "severity": "warn", "pattern": "повсюду", "flags": "i",
+     "message": "Проверь: «повсюду» не должно утверждать всеведение Жака как факт."},
+    {"id": "R-zhebi-case", "severity": "error", "pattern": "\\b(в|из|к|за)\\s+Жебь\\b", "flags": "",
+     "message": "Падеж: «в Жеби», «из Жеби», «к Жеби», «за Жебью». «Жебь» только именительный."},
+    {"id": "R-zhebe", "severity": "warn", "pattern": "Жебе\\b", "flags": "",
+     "message": "«Жебе» - форма источника И4. Допустима только в дословной цитате."},
+    {"id": "R-abdullah-src", "severity": "warn", "pattern": "Абдуллъ", "flags": "",
+     "message": "«Абдуллъ» - форма источника. В игровом тексте нормой считается «Абдулла»; допустимо только в цитате."},
+    {"id": "R-mojahed-src", "severity": "warn", "pattern": "маджахед", "flags": "i",
+     "message": "«маджахеды» - форма источника И5. Норма: «моджахеды»; допустимо только в цитате."},
+    {"id": "R-hasan", "severity": "warn", "pattern": "Хасан", "flags": "",
+     "message": "Хасан не показывается и не подтверждается; допустим только как предмет чужого слуха."},
+    {"id": "R-iblis-camel", "severity": "warn", "pattern": "трёхгорб|трехгорб", "flags": "i",
+     "message": "Обычные верблюды не трёхгорбые. Иблис не рисуется. Проверь контекст."},
+    {"id": "R-zlat", "severity": "warn", "pattern": "злат\\w*\\s+чертог", "flags": "i",
+     "message": "Злат чертог не отождествлять с чертогом Гэнг-Бэнга и не связывать с Жебью."}
+  ],
+  "max_count": [
+    {"id": "R-igrok", "severity": "warn", "pattern": "\\bигрок\\w*", "flags": "i", "max": 1,
+     "message": "Слово «игрок» звучит в игре ровно один раз (голос Улитки, первое появление). Летописец к «игроку» не обращается. Проверь все вхождения."}
+  ],
+  "years_by_camel": {"id": "R-years", "severity": "error", "allowed": [601, 629, 640],
+     "message": "Датировка только 601, 629, 640 по верблюду; остальным событиям дату не выдумывать."},
+  "forbid_filenames": [
+    {"id": "R-asset-iblis", "severity": "error", "pattern": "iblis|иблис", "flags": "i",
+     "dirs": ["assets", "scenes", "data"], "message": "Иблис не рисуется и не показывается."},
+    {"id": "R-asset-snail", "severity": "warn", "pattern": "ulitka|snail|улитк", "flags": "i",
+     "dirs": ["assets", "scenes"], "message": "Улитку не показывать: только голос."},
+    {"id": "R-asset-hasan", "severity": "warn", "pattern": "hasan|хасан", "flags": "i",
+     "dirs": ["assets", "scenes"], "message": "Хасан не показывается."}
+  ],
+  "json_text_needs_src": {"id": "R-src", "severity": "warn", "dirs": ["data"],
+     "allowed": ["к", "у", "п"],
+     "message": "У каждой текстовой единицы должно быть поле src: к, у или п (и по возможности ref)."}
+}

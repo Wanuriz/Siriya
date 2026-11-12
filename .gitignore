@@ -1,0 +1,8 @@
+.godot/
+export/
+*.translation
+tools/godot_path.txt
+art/_tmp/
+reports/
+__pycache__/
+*.pyc
