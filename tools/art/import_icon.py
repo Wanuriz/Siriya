@@ -51,6 +51,7 @@ FIGURE_MAX = 44          # longest figure side inside the icon
 ALPHA_THRESHOLD = 0.4    # binary cell alpha after the BOX downscale (one lead-allowed
                          # correction from 0.5: keeps the thin quill stroke alive)
 BG_KEY_DE = 6.0          # [с] corner-key threshold, OKLab*100 scale (Д-34)
+MAX_SRC_PIXELS = 16_777_216  # resource guard: 4096x4096, checked before any decode
 
 KMEANS_K = 9             # form colors before contour; + contour <= 10
 KMEANS_ITERS = 30
@@ -92,10 +93,31 @@ def hex_to_rgb(h: str) -> np.ndarray:
 
 def load_palette(path: Path) -> np.ndarray:
     colors = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    seen = {}
+    skipped = []
+    duplicates = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         line = line.strip().upper()
-        if len(line) == 6:
-            colors.append(hex_to_rgb(line))
+        if not line:
+            continue
+        if len(line) != 6 or any(c not in "0123456789ABCDEF" for c in line):
+            skipped.append((n, line))
+            continue
+        if line in seen:
+            duplicates.append((n, line))
+            continue
+        seen[line] = True
+        colors.append(hex_to_rgb(line))
+    if skipped:
+        print("ERROR: palette contains invalid line(s): %s"
+              % ", ".join("%d:%r" % (n, l) for n, l in skipped))
+        raise SystemExit(1)
+    if duplicates:
+        print("WARN: palette duplicates (first kept): %s"
+              % ", ".join("%d:%s" % (n, l) for n, l in duplicates))
+    if not colors:
+        print("ERROR: palette file %s contains no valid colors" % path)
+        raise SystemExit(1)
     return np.stack(colors)  # (N, 3) uint8
 
 
@@ -382,7 +404,12 @@ def main() -> int:
                     help="also write art/preview_icon/scribe_icon_x8.png")
     args = ap.parse_args()
 
-    src = Image.open(SRC_PATH).convert("RGB")
+    src = Image.open(SRC_PATH)
+    if src.width * src.height > MAX_SRC_PIXELS or min(src.size) < 2:
+        print("ERROR: source image %dx%d exceeds MAX_SRC_PIXELS %d (resource guard)"
+              % (src.width, src.height, MAX_SRC_PIXELS))
+        return 1
+    src = src.convert("RGB")
     rgb = np.asarray(src)
     alpha = bg_key_alpha(rgb)
     pal = load_palette(PALETTE_PATH)
@@ -407,7 +434,11 @@ def main() -> int:
 
     # --- k-means over the SOURCE figure pixels, dominant label per cell -----
     fig_mask = alpha_f == 255
-    fig_lab = rgb_to_oklab(rgb_f[fig_mask])            # (N, 3)
+    fig_lab = rgb_to_oklab(rgb_f[fig_mask])           # (N, 3)
+    if len(fig_lab) < KMEANS_K:
+        print("ERROR: figure has %d opaque source pixels, fewer than KMEANS_K=%d"
+              % (len(fig_lab), KMEANS_K))
+        return 1
     centroids = kmeans_fit(fig_lab, KMEANS_K)
     all_lab = np.empty((fh, fw), dtype=np.int32)
     all_lab[fig_mask] = nearest_lab(fig_lab, centroids)
@@ -426,7 +457,6 @@ def main() -> int:
     fig_count = np.bincount(fig_cells, minlength=nw * nh).reshape(nh, nw)
     frac = fig_count / np.maximum(cell_area, 1)
     mask[oy:oy + nh, ox:ox + nw] = frac >= ALPHA_THRESHOLD
-    dominant = np.zeros(nw * nh, dtype=np.int32)
     pair = fig_cells * len(pal) + slot_of_centroid[all_lab[fig_mask]]
     counts = np.bincount(pair, minlength=nw * nh * len(pal)).reshape(nw * nh, len(pal))
     dominant = counts.argmax(axis=1)
@@ -455,9 +485,16 @@ def main() -> int:
     added_n = int(added.sum())
     added_pct = 100.0 * added_n / float(mask.sum())
     print("connectivity: added %d px (%.1f%% of opaque)" % (added_n, added_pct))
+    if int((lab_grid[mask] < 0).sum()):
+        print("ERROR: %d opaque cells have no label after connectivity (fail-secure)"
+              % int((lab_grid[mask] < 0).sum()))
+        return 1
 
     # --- contour -------------------------------------------------------------
     pal_hex = ["%02X%02X%02X" % (int(p[0]), int(p[1]), int(p[2])) for p in pal]
+    if CONTOUR_HEX not in pal_hex:
+        print("ERROR: palette must contain the contour color %s" % CONTOUR_HEX)
+        return 1
     contour_slot = pal_hex.index(CONTOUR_HEX)
     h, w = mask.shape
     contour = np.zeros_like(mask)
@@ -533,7 +570,7 @@ def main() -> int:
     Image.fromarray(out, "RGBA").save(OUT_PATH)
     if args.preview:
         PREVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
-        Image.open(OUT_PATH).resize((ICON_SIZE * 8, ICON_SIZE * 8), Image.NEAREST) \
+        Image.fromarray(out, "RGBA").resize((ICON_SIZE * 8, ICON_SIZE * 8), Image.NEAREST) \
             .save(PREVIEW_PATH)
     print("written: %s%s" % (OUT_PATH.relative_to(ROOT),
                              " + %s" % PREVIEW_PATH.relative_to(ROOT) if args.preview else ""))

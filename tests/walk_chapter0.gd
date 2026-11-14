@@ -67,7 +67,8 @@ func _shot(frame_num: int) -> void:
 	await RenderingServer.frame_post_draw
 	var img: Image = root.get_texture().get_image()
 	var path := ProjectSettings.globalize_path("res://art/screens/ch0_%02d.png" % frame_num)
-	img.save_png(path)
+	var err := img.save_png(path)
+	_check(err == OK, "screenshot %s saved (error code %d)" % [path.get_file(), err])
 	print("  [shot %d] fade.a=%.4f img=%dx%d" % [frame_num,
 			current_scene.get_node("Fade").color.a, img.get_width(), img.get_height()])
 	# the text window must be actually drawn: count text-colored pixels in the
@@ -100,9 +101,15 @@ func _run() -> void:
 
 	change_scene_to_file(SCENE_PATH)
 	var loaded := await _wait_until(func() -> bool:
-		return current_scene != null and current_scene.scene_file_path == SCENE_PATH \
-				and not current_scene.get("busy") \
+		return current_scene != null and not current_scene.get("busy") \
+				and int(current_scene.get("current_frame")) == 1 \
 				and current_scene.get_node("Fade").color.a < 0.01, 300)
+	_check(loaded, "chapter0 loads and finishes its initial state")
+	if not loaded:
+		_done = true
+		print("TEST: FAIL - %d of %d checks failed" % [_failures, _checks])
+		quit(_exit_code)
+		return
 	# reset guard: if a stray press flipped the first frame during load, reload
 	if int(current_scene.get("current_frame")) != 1:
 		change_scene_to_file(SCENE_PATH)
@@ -110,7 +117,6 @@ func _run() -> void:
 			return current_scene != null and not current_scene.get("busy") \
 					and int(current_scene.get("current_frame")) == 1 \
 					and current_scene.get_node("Fade").color.a < 0.01, 300)
-	_check(loaded, "chapter0 loads and finishes its initial state")
 	_check(int(current_scene.get("current_frame")) == 1, "starts at frame 1")
 	_check(gs.has_flag("chapter0_done") == false, "flag chapter0_done absent before frame 7")
 	_check(current_scene.get_node("Gas").emitting == false, "frame 1: gas off")

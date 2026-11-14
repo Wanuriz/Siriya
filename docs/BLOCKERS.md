@@ -8,14 +8,12 @@
 - Что нужно от руководителя.
 - Статус: ОТКРЫТ / СНЯТ (дата, как).
 
-(пока пусто)
-
 ## 2026-11-12 - Субагенты упали по квоте (exceed quota limit)
 
 - Что случилось: два вызова субагентов вернули `failed: exceed quota limit`:
   1) godot-reviewer, круг 2 (повторное ревью 4 изменённых после круга 1 файлов: project.godot, scripts/game_state.gd, scenes/characters/player.tscn, tests/test_game_state.gd);
   2) playtester (прогон игры + walk-теста).
-- Что проверено без них (вывод команд в отчёте сессии): после правок круга 1 прогнаны заново `test_game_state` (STATE_TESTS_OK, 15), `test_player` (PLAYER_TESTS_OK, 11), `test_locations` (LOCATION_TESTS_OK, 33) headless; `walk_locations` оконно (WALK_TESTS_OK, 15); `python tools/check.py` -> `RESULT: OK`; запуск через Godot MCP -> консоль без ошибок (`errors: []`). Круг 1 ревью godot-reviewer: P0/P1 нет, 7xP2, из них 4 исправлены (P2-3 mouse_filter, P2-4 пиксельный снэп, P2-5 типизация Dictionary, P2-7 пин контракта), 3 не правились (P2-1 -> предложение П-32, P2-2/P2-6 сознательно).
+- Что проверено без них (вывод команд в отчёте сессии): после правок круга 1 прогнаны заново `test_game_state` (STATE_TESTS_OK, 15), `test_player` (PLAYER_TESTS_OK, 11), `test_locations` (LOCATION_TESTS_OK, 33) headless; `walk_locations` оконно (WALK_TESTS_OK, 16); `python tools/check.py` -> `RESULT: OK`; запуск через Godot MCP -> консоль без ошибок (`errors: []`). Круг 1 ревью godot-reviewer: P0/P1 нет, 7xP2, из них 4 исправлены (P2-3 mouse_filter, P2-4 пиксельный снэп, P2-5 типизация Dictionary, P2-7 пин контракта), 3 не правились (P2-1 -> предложение П-32, P2-2/P2-6 сознательно).
 - Что нужно от руководителя: либо принять тестовое подтверждение правок круга 1 как достаточное, либо разрешить повторный прогон godot-reviewer (круг 2) и playtester, когда квота субагентов восстановится.
 - Решение руководителя (2026-11-12): тестовое подтверждение круга 1 принято как достаточное. Круг 2 ревью (godot-reviewer) и playtester повторить перед ревью следующего шага.
-- Статус: СНЯТ (2026-11-12, решение руководителя; хвост: повтор godot-reviewer/playtester перед следующим ревью)
+- Статус: СНЯТ (2026-11-12, решение руководителя). Хвост (обновлено 2026-11-14, полный аудит): playtester повторён 2026-11-14 — walk_locations WALK_TESTS_OK (16 проверок), запуск через Godot MCP `errors: []` (отчёт docs/reviews/playtester-2026-11-14-audit.md); повтор godot-reviewer по файлам первого среза (project.godot, game_state.gd, player.tscn, test_game_state.gd) не выполнялся — хвост остаётся открытым до фактического повторного ревью этих файлов.

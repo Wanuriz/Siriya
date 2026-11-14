@@ -15,7 +15,7 @@
 Две локации и один диалог со сменой состояния:
 - **Базар Абдуллы** (глава 2): день, открытая площадь, диалог с Абдуллой.
 - **Оазис Жака** (глава 4): вечер, ключ с ситро, пальмы, первая дверь (финик).
-Фоны готовы: `assets/backgrounds/bazaar.png`, `oasis.png` (480x270). Герой и NPC пока заглушки.
+Фоны готовы: `assets/backgrounds/bazaar.png`, `oasis.png`, `gangbang.png` (480x270, палитра v3). Герой и NPC пока заглушки.
 
 ## 3. Структура проекта (корень репозитория = корень проекта Godot)
 
@@ -23,20 +23,20 @@
 project.godot
 AGENTS.md
 docs/        своды, процессные документы, plans/, reviews/
-scenes/      locations/, ui/, characters/
-scripts/     game_state.gd (autoload) и др.
-data/        dialogue/, chapters/, endings/ (JSON, у каждой реплики src)
-assets/      backgrounds/, characters/, ui/, audio/
-art/         palette.png, src/ (исходные картинки от нейросетей)
-tests/       test_*.gd (маркер *_OK), walk_*.gd
-tools/       check.py, canon_rules.json, art/import_bg.py
+scenes/      locations/, chapters/, characters/ (ui/ — план, появится с диалоговым UI)
+scripts/     game_state.gd (autoload), location.gd, player.gd, chapter0.gd
+data/        chapter0.json (dialogue/, chapters/, endings/ — план, появятся с диалогами и главами)
+assets/      backgrounds/ (bazaar, oasis, gangbang), ui/ (scribe_source*.png, scribe_icon.png) (characters/, audio/ — план)
+art/         палитры v1/v2/v3 (.png + .hex), src/ (исходные картинки от нейросетей), preview_*/, screens/, backup_v1/
+tests/       test_*.gd (маркер *_OK), walk_*.gd (оконные)
+tools/       check.py, canon_rules.json, test_canon_rules.py, art/import_bg.py, art/import_icon.py
 ```
 
 ## 4. Технические принципы
 
-- Данные отдельно от кода (JSON). Состояние сюжета: один autoload `GameState` с флагами из словаря состояний части С, раздел 0.3; сохранение и загрузка в JSON.
+- Данные отдельно от кода (JSON). Состояние сюжета: один autoload `GameState` с флагами из словаря состояний части С, раздел 0.3. Сохранение и загрузка не реализованы — плановая функциональность (JSON-файл; см. docs/ARCHITECTURE.md п.4 «намеренно отсутствует»).
 - Signal-up/call-down, именованные константы, API Godot 4.7 не угадывать (документация).
-- Арт: фоны генерирует руководитель в ChatGPT и Gemini, `tools/art/import_bg.py` приводит к 480x270 и общей палитре с закреплёнными акцентами. Новую картинку: `python tools/art/import_bg.py convert art/src/NAME.png assets/backgrounds/NAME.png --palette art/palette.png --preview`.
+- Арт: фоны генерирует руководитель в ChatGPT и Gemini, `tools/art/import_bg.py` приводит к 480x270 и общей палитре с закреплёнными акцентами. Новую картинку: `python tools/art/import_bg.py convert art/src/NAME.png assets/backgrounds/NAME.png --palette art/palette_v3.png --preview`. Иконки UI собирает `tools/art/import_icon.py` (исходники `assets/ui/scribe_source*.png` -> `assets/ui/`, палитра `art/palette_v3.hex`).
 - Свет: PointLight2D у фонарей, CanvasModulate по времени суток. 60 FPS на i5-11400 / 8 ГБ.
 - Лицензии: только свои, CC0 или OFL, записывать в `LICENSES.md`.
 

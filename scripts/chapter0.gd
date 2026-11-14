@@ -1,23 +1,22 @@
 extends Node2D
 ## Chapter 0 «Плёнка»: a viewer scene, no player, no walking.
 ##
-## ui_accept flips through the film frames of data/chapter0.json (7 frames).
+## ui_accept flips through the film frames of data/chapter0.json.
 ## A semi-transparent text window sits on top; gas particles run only on
-## frames 2 and 7; arriving at frame 7 sets the GameState flag chapter0_done
-## through the existing API. Transitions fade 0.3 s out and back; ui_accept is
-## ignored while fading and on the last frame; there is no going back.
+## the data-flagged frames; arriving at the last loaded frame sets the
+## GameState flag chapter0_done through the existing API. Transitions fade
+## 0.3 s out and back; ui_accept is ignored while fading and on the last
+## frame; there is no going back.
 
 const DATA_PATH := "res://data/chapter0.json"
 const BG_DIR := "res://assets/backgrounds/"
 const DARK_COLOR := Color("3b3251")
-const FRAME_BORDER_COLOR := Color("8d7da8")
 const TEXT_COLOR := Color("f5cba9")
-const LABEL_COLOR := Color("fde073")
 const INDIGO_TINT := Color("363a8c")
 const FADE_TIME := 0.3
-const LAST_FRAME := 7
 
-var frames: Array = []
+var frames: Array[Dictionary] = []
+var _last_frame := 0
 var current_frame: int = 0
 var busy: bool = false
 
@@ -61,10 +60,18 @@ func _ready() -> void:
 func _load_frames() -> void:
 	var f := FileAccess.open(DATA_PATH, FileAccess.READ)
 	if f == null:
+		push_error("chapter0: cannot open %s" % DATA_PATH)
 		return
 	var data = JSON.parse_string(f.get_as_text())
 	if data is Array:
-		frames = data
+		for item in data:
+			if not (item is Dictionary):
+				push_error("chapter0: invalid frame (not a Dictionary) in %s" % DATA_PATH)
+				return
+		frames.assign(data)
+		_last_frame = frames.size()
+	else:
+		push_error("chapter0: invalid JSON (not an Array) in %s" % DATA_PATH)
 
 
 func _setup_gas() -> void:
@@ -87,7 +94,7 @@ func _setup_gas() -> void:
 
 func _process(delta: float) -> void:
 	_blink_t += delta
-	blink_label.visible = fmod(_blink_t, 1.0) < 0.5
+	blink_label.visible = fmod(_blink_t, 1.0) < 0.5 and current_frame < _last_frame
 	if _fade_phase == 0:
 		return
 	if _fade_phase == 1:
@@ -111,7 +118,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _advance() -> void:
-	if busy or current_frame >= LAST_FRAME or frames.is_empty():
+	if busy or current_frame >= _last_frame or frames.is_empty():
 		return
 	busy = true
 	_fade_phase = 1
@@ -119,10 +126,14 @@ func _advance() -> void:
 
 
 func _apply_frame(n: int) -> void:
-	current_frame = n
 	if frames.is_empty() or n < 1 or n > frames.size():
 		return
-	var frame: Dictionary = frames[n - 1]
+	var frame_v: Variant = frames[n - 1]
+	if not (frame_v is Dictionary):
+		push_error("chapter0: frame %d is not a Dictionary in %s" % [n, DATA_PATH])
+		return
+	current_frame = n
+	var frame: Dictionary = frame_v
 	var bg: String = str(frame.get("bg", "solid"))
 	film_frame.visible = bg == "solid_frame"
 	placeholder_label.visible = false
@@ -134,9 +145,10 @@ func _apply_frame(n: int) -> void:
 			bg_sprite.texture = load(path)
 			bg_sprite.visible = true
 		else:
-			# placeholder for a missing background file (e.g. igloo.png):
-			# solid light color from the palette + a debug label
+			# placeholder for a missing background file: solid light color
+			# from the palette + a label naming the actual missing bg
 			bg_color.color = TEXT_COLOR
+			placeholder_label.text = bg + " (placeholder)"
 			placeholder_label.visible = true
 	var tint = frame.get("tint")
 	bg_sprite.modulate = INDIGO_TINT if tint == "indigo" else Color.WHITE
@@ -145,5 +157,5 @@ func _apply_frame(n: int) -> void:
 	var speaker: String = str(frame.get("speaker", ""))
 	speaker_label.text = speaker
 	speaker_label.visible = speaker != ""
-	if n == LAST_FRAME:
+	if n == _last_frame:
 		GameState.set_flag("chapter0_done", true)

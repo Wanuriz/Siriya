@@ -4,7 +4,8 @@
       "documents@zcode-plugins-official": false,
       "presentations@zcode-plugins-official": false,
       "pdf@zcode-plugins-official": false,
-      "spreadsheets@zcode-plugins-official": false
+      "spreadsheets@zcode-plugins-official": false,
+      "autoresearch@zcode-plugins-official": false
     }
   }
 }

@@ -4,7 +4,10 @@
 2. Распакуй этот архив в корень папки проекта. Получится `AGENTS.md`, `docs/`, `tools/`, `.gitignore`.
 3. Положи рядом четыре документа канона в `docs/` (имена: `lore_bible_part_A.md`, `game_bible_part_B.md`, `story_scenario_part_C.md`, `source_texts.txt`).
 4. Распакуй туда же `jak_art_kit.zip` (скрипт импорта фонов и готовые фоны).
-5. Установи Python-пакеты для арт-скрипта: `pip install pillow numpy`.
+5. Установи Python-зависимости для арт-инструментов (`tools/art/import_bg.py`, `tools/art/import_icon.py`) из `requirements.txt`. Проверенный базовый интерпретатор для арт-инструментов - Python 3.12:
+   - Windows: `py -3.12 -m pip install -r requirements.txt`
+   - macOS/Linux: `python3.12 -m pip install -r requirements.txt`
+   Арт-скрипты нужно запускать тем же интерпретатором, в который установлены пакеты. `tools/check.py` и `tools/test_canon_rules.py` используют только стандартную библиотеку Python - Pillow и NumPy им не требуются.
 6. Скажи ZCode путь к Godot: создай файл `tools/godot_path.txt` с одной строкой, путь к консольной версии, например `C:\\Users\\user\\Desktop\\Godot\\Godot_v4.7.2-stable_win64_console.exe`. Или задай переменную окружения `GODOT_BIN`.
 7. `git init`, первый коммит с префиксом `process:`.
 8. Проверка: `python tools/check.py` должен показать `RESULT: OK` (пока тестов нет) или `INCOMPLETE`, если Godot не найден.

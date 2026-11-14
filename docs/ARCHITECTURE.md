@@ -23,7 +23,7 @@ data/chapter0.json         кадры, тексты [п] и признаки к�
 
 ```gdscript
 func set_flag(flag_name: String, value: bool) -> void
-func get_flag(flag_name: String) -> bool    # несуществующий флаг = false
+func get_flag(flag_name: String, default: bool = false) -> bool    # несуществующий флаг = default (без аргумента - false)
 func has_flag(flag_name: String) -> bool
 func set_fruits(count: int) -> void         # clamp 0..3
 func get_fruits() -> int                    # старт 0
@@ -31,6 +31,7 @@ func get_fruits() -> int                    # старт 0
 
 - Внутри: `Dictionary` флагов и `int` счётчик плодов. Без сигналов, без ссылок на узлы, без сериализации.
 - Имена флагов берутся из словаря состояний части С, раздел 0.3; GameState их не знает (тупое хранилище).
+- `get_flag()` возвращает значение флага или `default`, если флаг отсутствует (без аргумента - `false`); существующее значение имеет приоритет над `default`. `has_flag()` позволяет отличить отсутствующий флаг от явно установленного `false`. Покрытие контракта: `tests/test_game_state.gd`.
 
 ## 3. Контракт переключения локаций
 

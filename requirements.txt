@@ -1,0 +1,5 @@
+# Зависимости только для вспомогательных арт-инструментов:
+# tools/art/import_bg.py и tools/art/import_icon.py.
+# tools/check.py и Python-тесты используют только стандартную библиотеку.
+Pillow>=13.0,<14
+numpy>=1.26,<3

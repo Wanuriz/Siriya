@@ -136,4 +136,125 @@ func _check_scene() -> void:
 	_check(blink != null and blink.text == "▼", "BlinkLabel shows ▼")
 	_check(node.has_node("Fade"), "Fade overlay present")
 	_check(int(node.get("current_frame")) == 1, "current_frame starts at 1")
+
+	# --- TDD П-34: invalid n must not mutate state before the guard ----------
+	# placed BEFORE any check that sets chapter0_done, so the flag is still
+	# in its initial state here; real autoload /root/GameState is used
+	var gs = root.get_node_or_null("GameState")
+	if gs == null:
+		gs = load("res://scripts/game_state.gd").new()
+		gs.name = "GameState"
+		root.add_child(gs)
+	_check(node.get("busy") == false, "П-34 precondition: busy is false")
+	var flag_before: bool = gs.has_flag("chapter0_done")
+	var flag_val_before: bool = gs.get_flag("chapter0_done")
+	var cf_before: int = int(node.get("current_frame"))
+	var text_before: String = node.text_label.text
+
+	node._apply_frame(99)
+	_check(int(node.get("current_frame")) == cf_before,
+			"П-34: _apply_frame(99) keeps current_frame (got %s)" % str(node.get("current_frame")))
+	_check(node.get("busy") == false, "П-34: _apply_frame(99) keeps busy false")
+	_check(gs.has_flag("chapter0_done") == flag_before
+			and gs.get_flag("chapter0_done") == flag_val_before,
+			"П-34: _apply_frame(99) keeps chapter0_done state unchanged")
+	_check(node.text_label.text == text_before,
+			"П-34: _apply_frame(99) keeps the shown frame text")
+
+	node._apply_frame(0)
+	_check(int(node.get("current_frame")) == cf_before,
+			"П-34: _apply_frame(0) keeps current_frame")
+	node._apply_frame(-3)
+	_check(int(node.get("current_frame")) == cf_before,
+			"П-34: _apply_frame(-3) keeps current_frame")
+	_check(gs.has_flag("chapter0_done") == flag_before
+			and gs.get_flag("chapter0_done") == flag_val_before,
+			"П-34: invalid n keeps chapter0_done state unchanged")
+
+	# valid n still applies
+	node._apply_frame(3)
+	_check(int(node.get("current_frame")) == 3, "П-34: valid n still applies (current_frame 3)")
+	_check(node.text_label.text == str(node.frames[2].get("text", "")),
+			"П-34: valid n shows the frame 3 text")
+
+	# empty dataset: _apply_frame must not mutate current_frame either
+	node.frames.assign([])
+	node.set("_last_frame", 0)
+	var cf_before_empty: int = int(node.get("current_frame"))
+	node._apply_frame(1)
+	_check(int(node.get("current_frame")) == cf_before_empty,
+			"П-34: _apply_frame on empty dataset keeps current_frame (got %s)"
+					% str(node.get("current_frame")))
+
+	# state isolation: restore the real dataset for the checks below
+	node._load_frames()
+
+	# --- TDD: the last frame comes from the loaded data, not a constant -------
+	# reuses `gs` (the /root/GameState resolved in the П-34 block above)
+
+	# real data: _last_frame must follow frames.size()
+	var last_v: Variant = node.get("_last_frame")
+	_check(last_v is int and int(last_v) == node.frames.size() and node.frames.size() == 7,
+			"_last_frame follows frames.size() after load (last=%s, frames=%d)"
+					% [str(last_v), node.frames.size()])
+
+	# two-frame dataset: frame 2 is the last one (post-load state is emulated
+	# by setting _last_frame directly; loading a 2-frame file would require
+	# modifying data/chapter0.json, which is out of scope)
+	node.frames.assign([
+		{"id": 1, "bg": "solid", "tint": null, "gas": false, "speaker": "", "text": "", "src": "п", "ref": "t"},
+		{"id": 2, "bg": "solid", "tint": null, "gas": false, "speaker": "", "text": "", "src": "п", "ref": "t"},
+	])
+	node.set("_last_frame", node.frames.size())
+	node._apply_frame(2)
+	_check(gs.has_flag("chapter0_done") == true,
+			"frame 2 of a 2-frame dataset sets chapter0_done")
+	_check(int(node.get("current_frame")) == 2, "current_frame is 2 after the last frame")
+	node._advance()
+	_check(node.get("busy") == false and int(node.get("current_frame")) == 2,
+			"advance is blocked on the last frame (busy=%s, frame=%s)"
+					% [str(node.get("busy")), str(node.get("current_frame"))])
+
+	# empty dataset: no advancing, the last frame stays safe (0)
+	node.frames.assign([])
+	node.set("_last_frame", 0)
+	node._apply_frame(1)
+	node._advance()
+	var last_empty: Variant = node.get("_last_frame")
+	_check(last_empty is int and int(last_empty) == 0 and node.get("busy") == false,
+			"empty dataset keeps _last_frame 0 and blocks advancing (last=%s, busy=%s)"
+					% [str(last_empty), str(node.get("busy"))])
+
+	# --- polish A5: the arrow blinks on intermediate frames, not the last ----
+	# restore the real dataset after the blocks above
+	node._load_frames()
+	node._blink_t = 0.0
+	node._apply_frame(1)
+	node._process(0.016)
+	_check(node.blink_label.visible == true,
+			"polish A5: arrow visible on an intermediate frame")
+	node._blink_t = 0.0
+	node._apply_frame(int(node.get("_last_frame")))
+	node._process(0.016)
+	_check(node.blink_label.visible == false,
+			"polish A5: arrow does not blink on the last frame")
+
+	# --- polish A3: the placeholder label names the actual missing bg --------
+	node.frames.assign([{"id": 1, "bg": "ghost.png", "tint": null, "gas": false,
+			"speaker": "", "text": "", "src": "п", "ref": "t"}])
+	node.set("_last_frame", node.frames.size())
+	node._apply_frame(1)
+	_check(node.placeholder_label.text == "ghost.png (placeholder)",
+			"polish A3: placeholder label names the actual bg (got %s)"
+					% str(node.placeholder_label.text))
+	node._load_frames()  # restore the real dataset
+
+	# --- polish A4: every loaded frame is a Dictionary ------------------------
+	var all_dicts := true
+	for f in node.frames:
+		if not (f is Dictionary):
+			all_dicts = false
+	_check(all_dicts and node.frames.size() == 7,
+			"polish A4: all %d loaded frames are Dictionaries" % node.frames.size())
+
 	node.free()
