@@ -810,15 +810,20 @@ def rel(path):
     return path.relative_to(ROOT).as_posix()
 
 
-def walk_json(node, path, out):
+def walk_json(node, path, out, budget_check=None):
+    """Collect text nodes of a parsed JSON document. budget_check (stage
+    E-6A-2, optional) is called on every visit; when it returns True the
+    traversal stops immediately and the caller unwinds (fail-secure)."""
+    if budget_check is not None and budget_check():
+        return
     if isinstance(node, dict):
         if isinstance(node.get("text"), str) and node["text"].strip():
             out.append((path, node))
         for k, v in node.items():
-            walk_json(v, f"{path}/{k}", out)
+            walk_json(v, f"{path}/{k}", out, budget_check)
     elif isinstance(node, list):
         for i, v in enumerate(node):
-            walk_json(v, f"{path}[{i}]", out)
+            walk_json(v, f"{path}[{i}]", out, budget_check)
 
 
 def canon_lint():
@@ -975,21 +980,39 @@ def canon_lint():
         return
 
     s = rules.get("json_text_needs_src")
-    if s:
+    if s and not over_budget:
         for d in s.get("dirs", []):
+            if over_budget:
+                break
             base = ROOT / d
             if not base.exists():
                 continue
             for p in sorted(base.rglob("*.json")):
+                if over_time():   # budget before decoding each file
+                    break
                 try:
                     data = json.loads(p.read_text(encoding="utf-8"))
                 except ValueError:
                     continue
+                if over_time():   # and after the decode finished
+                    break
                 found = []
-                walk_json(data, "", found)
+                walk_json(data, "", found, over_time)
+                if over_budget:
+                    break
                 for jpath, node in found:
+                    if over_time():   # and while reporting text nodes
+                        break
                     if node.get("src") not in s["allowed"]:
                         report(s["severity"], s["id"], f"{rel(p)}{jpath}", s["message"])
+                if over_budget:
+                    break
+            if over_budget:
+                break
+        if over_budget:
+            return
+    if over_budget:
+        return
 
 
 def find_godot():

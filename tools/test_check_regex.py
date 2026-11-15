@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone test for tools/check.py regex hardening (stages E..E-6A).
+r"""Standalone test for tools/check.py regex hardening (stages E..E-6A).
 
 Verifies (against the LIVE functions from tools/check.py):
   1) the linear MARKER scan (find_ok_marker) matches the former regex
@@ -1051,6 +1051,100 @@ def main() -> int:
         else:
             print("sec 11c pattern-length: 300 compiles, 301 rejected in "
                   "forbid/max_count/forbid_filenames with [ERROR] + rule id")
+
+    # --- 11d) RULE_TIME_BUDGET inside the json_text_needs_src section -------
+    # Deterministic FakeTime: monotonic() returns 0.0 for the first 13 calls
+    # (deadline + forbid line + json-before/after a.json + the first three
+    # walk_json visits of a.json + json-before/after b.json + the first two
+    # walk_json visits of b.json) and 100.0 on call 14 - issued INSIDE
+    # walk_json on node "/n/m" of the SECOND json file. Traced empirically
+    # (19 budget calls in total for this ruleset).
+    if not check._RE2_AVAILABLE:
+        print("sec 11d json budget skipped (RE2 unavailable)")
+    else:
+        json_fail = 0
+        orig_time = check.time
+        orig = {k: getattr(check, k) for k in
+                ("MAX_LINE_LENGTH", "MAX_TOTAL_CHARS", "MAX_RULES",
+                 "RULE_TIME_BUDGET", "RULES_PATH", "ROOT")}
+        try:
+            with tempfile.TemporaryDirectory(prefix="siriya_jsonbud_") as td:
+                tdp = Path(td)
+                (tdp / "scan").mkdir()
+                (tdp / "data").mkdir()
+                (tdp / "data" / "a.json").write_text(
+                    '{"text": "ok", "n": {"text": "ok"}}', encoding="utf-8")
+                (tdp / "data" / "b.json").write_text(
+                    '{"text": "ok", "n": {"m": {"text": "ok"}}}',
+                    encoding="utf-8")
+                (tdp / "data" / "c.json").write_text(
+                    '{"text": "never reached"}', encoding="utf-8")
+                (tdp / "scan" / "f.txt").write_text("STATE ok\n", encoding="utf-8")
+                check.RULES_PATH = tdp / "canon_rules.json"
+                check.ROOT = tdp
+                check.MAX_LINE_LENGTH = 10 ** 6
+                check.MAX_TOTAL_CHARS = 10 ** 9
+                check.MAX_RULES = 100
+                check.RULE_TIME_BUDGET = 60.0
+                check.time = _FakeTime([0.0] * 13 + [100.0])
+                check.RULES_PATH.write_text(json.dumps({
+                    "scan_dirs": ["scan"], "scan_ext": [".txt"],
+                    "forbid": [{"id": "R-x", "pattern": "STATE",
+                                "severity": "warn", "message": "x"}],
+                    "json_text_needs_src": {"id": "R-src", "severity": "warn",
+                                            "dirs": ["data"], "allowed": ["к"],
+                                            "message": "s"},
+                }), encoding="utf-8")
+                err0 = check.errors
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    check.canon_lint()
+                out = buf.getvalue()
+                # exactly one R-limit ERROR (fail-secure stop)
+                if check.errors - err0 != 1:
+                    json_fail += 1
+                    print("FAIL 11d: expected exactly one ERROR (the R-limit), "
+                          "got delta %d: %r" % (check.errors - err0,
+                                                out[:200]))
+                if out.count("[ERROR] R-limit") != 1 \
+                        or "RULE_TIME_BUDGET" not in out:
+                    json_fail += 1
+                    print("FAIL 11d: budget ERROR missing/duplicated: %r"
+                          % out[:200])
+                # json traversal ran UNTIL the stop: only the FULLY walked
+                # file (a.json: 2 text nodes) is reported; the budget fired
+                # inside walk_json of b.json, so b.json and c.json report
+                # nothing (no silent partial results)
+                if out.count("R-src") != 2:
+                    json_fail += 1
+                    print("FAIL 11d: expected exactly 2 R-src nodes before the "
+                          "stop, got %d: %r" % (out.count("R-src"), out[:300]))
+                if "b.json" in out:
+                    json_fail += 1
+                    print("FAIL 11d: second json file was reported after the "
+                          "budget stopped inside its traversal")
+                if "c.json" in out:
+                    json_fail += 1
+                    print("FAIL 11d: third json file was processed after the "
+                          "stop")
+                # the forbid section ran BEFORE json (normal order) and did
+                # not run again after the stop: exactly one R-x warning
+                if out.count("R-x") != 1:
+                    json_fail += 1
+                    print("FAIL 11d: forbid rule scanned after the stop: %r"
+                          % out[:200])
+        finally:
+            check.time = orig_time
+            for k, v in orig.items():
+                setattr(check, k, v)
+        if json_fail:
+            failures += json_fail
+            print("sec 11d json budget: %d failures" % json_fail)
+        else:
+            print("sec 11d json budget: FakeTime proof - budget fires inside "
+                  "walk_json (node /n/m of the second file), exactly one "
+                  "R-limit, node after the stop and the third file are not "
+                  "processed, no section reruns")
 
     # --- 12) fail-secure: missing RE2 binding -> explicit ERROR, rules not run
     orig_re2_avail = check._RE2_AVAILABLE

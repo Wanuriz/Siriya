@@ -33,6 +33,13 @@ exit 1 WITHOUT writing the icon. Only numpy and PIL are used.
 
 Reads ONLY: assets/ui/scribe_source.png, art/palette_v3.hex.
 Writes ONLY: assets/ui/scribe_icon.png, art/preview_icon/scribe_icon_x8.png.
+
+Source note (stage E-6A-2, documentation only): the script reads
+assets/ui/scribe_source.png via the SRC_PATH constant below - it does NOT
+switch sources automatically. assets/ui/scribe_source_v2.png (lead-provided
+third-round source, committed in 97458d9) is the recommended input for the
+not-yet-run third icon round: to use it, point SRC_PATH at that file (one
+constant change), rerun the pipeline and the gates.
 """
 import argparse
 from pathlib import Path

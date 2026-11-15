@@ -23,6 +23,16 @@ Conversion maps every pixel to the nearest palette color in OKLab
 (perceptual Euclidean, not RGB) and prints mean/max color error in the same
 OKLab*100 scale. --measure-only prints the error table without writing files
 (used to compare palettes with one and the same method).
+
+Palette versions actually shipped (docs/STATUS.md, Д-21/П-33): the 2026-11-12
+base is art/palette_v2.png (48 colors); the CURRENT game palette is
+art/palette_v3.png / art/palette_v3.hex (also 48 colors; added #79C1E3,
+removed #FFBA53 - Д-21/П-33). The CLI takes the palette path as an argument,
+so the same commands operate on any version: pass art/palette_v3.png (and
+point --palette at art/palette_v3.hex-derived files where applicable) for
+the backgrounds shipped in assets/backgrounds/ (bazaar and gangbang use
+dithering, oasis does not). The command examples above are kept in the
+historical v2 wording.
 """
 import argparse
 import sys
