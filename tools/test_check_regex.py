@@ -1146,6 +1146,118 @@ def main() -> int:
                   "R-limit, node after the stop and the third file are not "
                   "processed, no section reruns")
 
+    # --- 11e) abort propagates through walk_json recursion (sibling proof) --
+    # The OLD implementation (plain "return" from the recursive call) VISITS
+    # the siblings after the abort node: the abort only unwinds one call, so
+    # /sib, /after AND all their nested descendants are entered (verified
+    # empirically: 9 visit entries on this exact document; the one-shot
+    # clock returns 0 to every later budget check). The NEW implementation
+    # must not visit them at all: the traced visit log must contain exactly
+    # [root, /text] and neither /sib nor /after. Deterministic via a
+    # one-shot budget clock (fires on the visit of /text).
+    if not check._RE2_AVAILABLE:
+        print("sec 11e abort-propagation skipped (RE2 unavailable)")
+    else:
+        ab_fail = 0
+        orig_time = check.time
+        orig_walk = check.walk_json
+        orig = {k: getattr(check, k) for k in
+                ("MAX_LINE_LENGTH", "MAX_TOTAL_CHARS", "MAX_RULES",
+                 "RULE_TIME_BUDGET", "RULES_PATH", "ROOT")}
+        try:
+            with tempfile.TemporaryDirectory(prefix="siriya_abort_") as td:
+                tdp = Path(td)
+                (tdp / "data").mkdir()
+                # dict order of visits: <root>, /text, /sib (BUDGET FIRES),
+                # then siblings /after (with nested /after/text,
+                # /after/deep, /after/deep/text) would follow on the old
+                # implementation - they must never be visited now
+                (tdp / "data" / "x.json").write_text(json.dumps({
+                    "text": "ok",
+                    "sib": {"text": "SIB", "deep": {"text": "DEEP"}},
+                    "after": {"text": "AFTER", "deep": {"text": "DEEP2"}},
+                }, ensure_ascii=False), encoding="utf-8")
+                check.RULES_PATH = tdp / "canon_rules.json"
+                check.ROOT = tdp
+                check.MAX_LINE_LENGTH = 10 ** 6
+                check.MAX_TOTAL_CHARS = 10 ** 9
+                check.MAX_RULES = 100
+                check.RULE_TIME_BUDGET = 60.0
+                # monotonic call trace: 1 deadline; 2 json before-file;
+                # 3 after-loads; 4 root visit (0 -> scanned); 5 /text visit
+                # -> 100: budget fires at the /text ENTRY (before /sib).
+                # The clock returns 0 again afterwards BY DESIGN: this makes
+                # the OLD non-propagating walk_json visit /sib, /after and
+                # all their descendants (each gets its own budget check),
+                # while the NEW implementation must stop at /text entirely.
+                # The visit log is the real assertion; the call index is
+                # deterministic because dict order is insertion order.
+                class _OneShotBudget:
+                    def __init__(self):
+                        self.calls = 0
+
+                    def monotonic(self):
+                        self.calls += 1
+                        return 100.0 if self.calls == 5 else 0.0
+
+                check.time = _OneShotBudget()
+
+                visits = []
+
+                def traced_walk(node, path, out, budget_check=None):
+                    visits.append(path if path else "<root>")
+                    return orig_walk(node, path, out, budget_check)
+
+                check.walk_json = traced_walk
+                check.RULES_PATH.write_text(json.dumps({
+                    "scan_dirs": [], "scan_ext": [".txt"],
+                    "json_text_needs_src": {"id": "R-src", "severity": "warn",
+                                            "dirs": ["data"], "allowed": ["к"],
+                                            "message": "s"},
+                }), encoding="utf-8")
+                err0 = check.errors
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    check.canon_lint()
+                out = buf.getvalue()
+                expect = ["<root>", "/text"]
+                if visits != expect:
+                    ab_fail += 1
+                    print("FAIL 11e: visit log differs; the old "
+                          "implementation additionally visits the siblings "
+                          "/sib and /after (entry visits): %r" % visits)
+                if any(v.startswith("/after") for v in visits) \
+                        or "/sib/deep" in visits:
+                    ab_fail += 1
+                    print("FAIL 11e: siblings visited after the budget abort")
+                if check.errors - err0 != 1 \
+                        or out.count("[ERROR] R-limit") != 1:
+                    ab_fail += 1
+                    print("FAIL 11e: expected exactly one R-limit ERROR, "
+                          "delta %d: %r" % (check.errors - err0, out[:200]))
+                # per the fail-secure task rule, collected nodes are NOT
+                # processed after an abort: exactly zero R-src reports, only
+                # the single R-limit ERROR
+                if out.count("R-src") != 0:
+                    ab_fail += 1
+                    print("FAIL 11e: collected nodes were processed after "
+                          "the abort: %r" % out[:300])
+        finally:
+            check.walk_json = orig_walk
+            check.time = orig_time
+            for k, v in orig.items():
+                setattr(check, k, v)
+        if ab_fail:
+            failures += ab_fail
+            print("sec 11e abort-propagation: %d failures" % ab_fail)
+        else:
+            print("sec 11e abort-propagation: visit log exactly %r - the "
+                  "budget fired at the /text entry; the siblings /sib and "
+                  "/after and their nested descendants were never visited "
+                  "(the old implementation entered all of them: 9 visits "
+                  "empirically); one R-limit, fail-secure preserved"
+                  % ([_u(v) for v in visits],))
+
     # --- 12) fail-secure: missing RE2 binding -> explicit ERROR, rules not run
     orig_re2_avail = check._RE2_AVAILABLE
     sys.modules["re2"] = None   # blocks "import re2" inside reload

@@ -813,17 +813,23 @@ def rel(path):
 def walk_json(node, path, out, budget_check=None):
     """Collect text nodes of a parsed JSON document. budget_check (stage
     E-6A-2, optional) is called on every visit; when it returns True the
-    traversal stops immediately and the caller unwinds (fail-secure)."""
+    traversal aborts: walk_json returns True immediately, every recursive
+    caller checks its child's result and returns True without visiting the
+    remaining siblings, so NO sibling or descendant is visited after the
+    budget fired. Returns True on abort, False on normal completion."""
     if budget_check is not None and budget_check():
-        return
+        return True
     if isinstance(node, dict):
         if isinstance(node.get("text"), str) and node["text"].strip():
             out.append((path, node))
         for k, v in node.items():
-            walk_json(v, f"{path}/{k}", out, budget_check)
+            if walk_json(v, f"{path}/{k}", out, budget_check):
+                return True
     elif isinstance(node, list):
         for i, v in enumerate(node):
-            walk_json(v, f"{path}[{i}]", out, budget_check)
+            if walk_json(v, f"{path}[{i}]", out, budget_check):
+                return True
+    return False
 
 
 def canon_lint():
@@ -997,7 +1003,11 @@ def canon_lint():
                 if over_time():   # and after the decode finished
                     break
                 found = []
-                walk_json(data, "", found, over_time)
+                # walk_json returns True when the budget fired INSIDE the
+                # traversal: skip the collected nodes entirely and unwind
+                # (fail-secure; no sibling of the abort node is visited)
+                if walk_json(data, "", found, over_time):
+                    break
                 if over_budget:
                     break
                 for jpath, node in found:
